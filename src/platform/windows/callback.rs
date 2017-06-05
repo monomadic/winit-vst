@@ -5,6 +5,7 @@ use std::sync::mpsc::Sender;
 use std::sync::{Arc, Mutex};
 use std::ffi::OsString;
 use std::os::windows::ffi::OsStringExt;
+use std::collections::HashMap;
 
 use CursorState;
 use Event;
@@ -18,7 +19,7 @@ use winapi;
 /// There's no parameters passed to the callback function, so it needs to get
 /// its context (the HWND, the Sender for events, etc.) stashed in
 /// a thread-local variable.
-thread_local!(pub static CONTEXT_STASH: RefCell<Option<ThreadLocalData>> = RefCell::new(None));
+thread_local!(pub static CONTEXT_STASH: RefCell<HashMap<winapi::HWND, ThreadLocalData>> = RefCell::new(HashMap::new()));
 
 pub struct ThreadLocalData {
     pub win: winapi::HWND,
@@ -43,9 +44,9 @@ struct MinMaxInfo {
 fn send_event(input_window: winapi::HWND, event: Event) {
     CONTEXT_STASH.with(|context_stash| {
         let context_stash = context_stash.borrow();
-        let stored = match *context_stash {
+        let stored = match (*context_stash).get(&input_window) {
             None => return,
-            Some(ref v) => v
+            Some(v) => v
         };
 
         let &ThreadLocalData { ref win, ref sender, .. } = stored;
@@ -72,9 +73,9 @@ pub unsafe extern "system" fn callback(window: winapi::HWND, msg: winapi::UINT,
 
             CONTEXT_STASH.with(|context_stash| {
                 let context_stash = context_stash.borrow();
-                let stored = match *context_stash {
+                let stored = match (*context_stash).get(&window) {
                     None => return,
-                    Some(ref v) => v
+                    Some(v) => v
                 };
 
                 let &ThreadLocalData { ref win, .. } = stored;
@@ -128,7 +129,7 @@ pub unsafe extern "system" fn callback(window: winapi::HWND, msg: winapi::UINT,
             use events::Event::{MouseEntered, MouseMoved};
             let mouse_outside_window = CONTEXT_STASH.with(|context_stash| {
                 let mut context_stash = context_stash.borrow_mut();
-                if let Some(context_stash) = context_stash.as_mut() {
+                if let Some(context_stash) = (*context_stash).get_mut(&window) {
                     if !context_stash.mouse_in_window {
                         context_stash.mouse_in_window = true;
                         return true;
@@ -140,7 +141,7 @@ pub unsafe extern "system" fn callback(window: winapi::HWND, msg: winapi::UINT,
 
             if mouse_outside_window {
                 send_event(window, MouseEntered);
-                
+
                 // Calling TrackMouseEvent in order to receive mouse leave events.
                 user32::TrackMouseEvent(&mut winapi::TRACKMOUSEEVENT {
                     cbSize: mem::size_of::<winapi::TRACKMOUSEEVENT>() as winapi::DWORD,
@@ -162,7 +163,7 @@ pub unsafe extern "system" fn callback(window: winapi::HWND, msg: winapi::UINT,
             use events::Event::MouseLeft;
             let mouse_in_window = CONTEXT_STASH.with(|context_stash| {
                 let mut context_stash = context_stash.borrow_mut();
-                if let Some(context_stash) = context_stash.as_mut() {
+                if let Some(context_stash) = (*context_stash).get_mut(&window) {
                     if context_stash.mouse_in_window {
                         context_stash.mouse_in_window = false;
                         return true;
@@ -274,7 +275,7 @@ pub unsafe extern "system" fn callback(window: winapi::HWND, msg: winapi::UINT,
             use events::Event::MouseInput;
             use events::MouseButton::Other;
             use events::ElementState::Released;
-            let xbutton = winapi::HIWORD(wparam as winapi::DWORD) as winapi::c_int; 
+            let xbutton = winapi::HIWORD(wparam as winapi::DWORD) as winapi::c_int;
             send_event(window, MouseInput(Released, Other(xbutton as u8)));
             0
         },
@@ -315,7 +316,7 @@ pub unsafe extern "system" fn callback(window: winapi::HWND, msg: winapi::UINT,
             let call_def_window_proc = CONTEXT_STASH.with(|context_stash| {
                 let cstash = context_stash.borrow();
                 let mut call_def_window_proc = false;
-                if let Some(cstash) = cstash.as_ref() {
+                if let Some(cstash) = cstash.get(&window) {
                     if let Ok(window_state) = cstash.window_state.lock() {
                         if cstash.mouse_in_window {
                             match window_state.cursor_state {
@@ -339,7 +340,7 @@ pub unsafe extern "system" fn callback(window: winapi::HWND, msg: winapi::UINT,
 
             if call_def_window_proc {
                 user32::DefWindowProcW(window, msg, wparam, lparam)
-            } else {    
+            } else {
                 0
             }
         },
@@ -369,7 +370,7 @@ pub unsafe extern "system" fn callback(window: winapi::HWND, msg: winapi::UINT,
             //(*mmi).max_size = winapi::POINT { x: .., y: .. }; // The dimensions of the primary monitor.
 
             CONTEXT_STASH.with(|context_stash| {
-                match context_stash.borrow().as_ref() {
+                match context_stash.borrow().get(&window) {
                     Some(cstash) => {
                         let window_state = cstash.window_state.lock().unwrap();
 

@@ -11,7 +11,7 @@ use native_monitor::NativeMonitorId;
 use libc;
 use platform;
 
-use libc::c_void;
+use std::os::raw::c_void;
 
 impl WindowBuilder {
     /// Initializes a new `WindowBuilder` with default values.
@@ -37,7 +37,7 @@ impl WindowBuilder {
         self.window.dimensions = Some((width, height));
         self
     }
-    
+
     /// Sets a minimum dimension size for the window
     ///
     /// Width and height are in pixels.
@@ -238,7 +238,7 @@ impl Window {
     pub fn get_inner_size(&self) -> Option<(u32, u32)> {
         self.window.get_inner_size()
     }
-    
+
     /// Returns the size in points of the client area of the window.
     ///
     /// The client area is the content of the window, excluding the title bar and borders.

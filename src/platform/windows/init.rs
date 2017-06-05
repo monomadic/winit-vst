@@ -15,10 +15,12 @@ use CreationError;
 use CreationError::OsError;
 use CursorState;
 use WindowAttributes;
+use platform;
 
 use std::ffi::{OsStr};
 use std::os::windows::ffi::OsStrExt;
 use std::sync::mpsc::channel;
+use std::os::raw::c_void;
 
 use winapi;
 use kernel32;
@@ -35,38 +37,51 @@ pub fn new_window(window: &WindowAttributes, pl_attribs: &PlatformSpecificWindow
 
     let (tx, rx) = channel();
 
-    // `GetMessage` must be called in the same thread as CreateWindow, so we create a new thread
-    // dedicated to this window.
-    thread::spawn(move || {
+    let window2 = WindowAttributes2::from(window.clone());
+
+    let parent = window.parent.unwrap_or(ptr::null_mut());
+    if !parent.is_null() {
         unsafe {
             // creating and sending the `Window`
-            match init(title, &window, attribs) {
+            match init(title, &window2, pl_attribs.clone(), parent as winapi::HWND) {
                 Ok(w) => tx.send(Ok(w)).ok(),
-                Err(e) => {
-                    tx.send(Err(e)).ok();
-                    return;
-                }
+                Err(e) => tx.send(Err(e)).ok(),
             };
-
-            // now that the `Window` struct is initialized, the main `Window::new()` function will
-            //  return and this events loop will run in parallel
-            loop {
-                let mut msg = mem::uninitialized();
-
-                if user32::GetMessageW(&mut msg, ptr::null_mut(), 0, 0) == 0 {
-                    break;
-                }
-
-                user32::TranslateMessage(&msg);
-                user32::DispatchMessageW(&msg);   // calls `callback` (see the callback module)
-            }
         }
-    });
+    } else {
+        // `GetMessage` must be called in the same thread as CreateWindow, so we create a new thread
+        // dedicated to this window.
+        thread::spawn(move || {
+            unsafe {
+                // creating and sending the `Window`
+                match init(title, &window2, attribs, ptr::null_mut()) {
+                    Ok(w) => tx.send(Ok(w)).ok(),
+                    Err(e) => {
+                        tx.send(Err(e)).ok();
+                        return;
+                    }
+                };
+
+                // now that the `Window` struct is initialized, the main `Window::new()` function will
+                //  return and this events loop will run in parallel
+                loop {
+                    let mut msg = mem::uninitialized();
+
+                    if user32::GetMessageW(&mut msg, ptr::null_mut(), 0, 0) == 0 {
+                        break;
+                    }
+
+                    user32::TranslateMessage(&msg);
+                    user32::DispatchMessageW(&msg);   // calls `callback` (see the callback module)
+                }
+            }
+        });
+    }
 
     rx.recv().unwrap()
 }
 
-unsafe fn init(title: Vec<u16>, window: &WindowAttributes, pl_attribs: PlatformSpecificWindowBuilderAttributes) -> Result<Window, CreationError> {
+unsafe fn init(title: Vec<u16>, window: &WindowAttributes2, _pl_attribs: PlatformSpecificWindowBuilderAttributes, maybe_parent: winapi::HWND) -> Result<Window, CreationError> {
     // registering the window class
     let class_name = register_window_class();
 
@@ -88,10 +103,9 @@ unsafe fn init(title: Vec<u16>, window: &WindowAttributes, pl_attribs: PlatformS
     let (ex_style, style) = if window.monitor.is_some() || !window.decorations {
         (winapi::WS_EX_APPWINDOW,
             //winapi::WS_POPUP is incompatible with winapi::WS_CHILD
-            if pl_attribs.parent.is_some() {
+            if !maybe_parent.is_null() {
                 winapi::WS_CLIPSIBLINGS | winapi::WS_CLIPCHILDREN
-            }
-            else {
+            } else {
                 winapi::WS_POPUP | winapi::WS_CLIPSIBLINGS | winapi::WS_CLIPCHILDREN
             }
         )
@@ -123,7 +137,7 @@ unsafe fn init(title: Vec<u16>, window: &WindowAttributes, pl_attribs: PlatformS
             style | winapi::WS_VISIBLE
         };
 
-        if pl_attribs.parent.is_some() {
+        if !maybe_parent.is_null() {
             style |= winapi::WS_CHILD;
         }
 
@@ -133,7 +147,7 @@ unsafe fn init(title: Vec<u16>, window: &WindowAttributes, pl_attribs: PlatformS
             style | winapi::WS_CLIPSIBLINGS | winapi::WS_CLIPCHILDREN,
             x.unwrap_or(winapi::CW_USEDEFAULT), y.unwrap_or(winapi::CW_USEDEFAULT),
             width.unwrap_or(winapi::CW_USEDEFAULT), height.unwrap_or(winapi::CW_USEDEFAULT),
-            pl_attribs.parent.unwrap_or(ptr::null_mut()),
+            maybe_parent,
             ptr::null_mut(), kernel32::GetModuleHandleW(ptr::null()),
             ptr::null_mut());
 
@@ -168,6 +182,20 @@ unsafe fn init(title: Vec<u16>, window: &WindowAttributes, pl_attribs: PlatformS
         user32::SetForegroundWindow(real_window.0);
     }
 
+    let window = WindowAttributes {
+        dimensions: window.dimensions,
+        min_dimensions: window.min_dimensions,
+        max_dimensions: window.max_dimensions,
+        monitor: window.monitor.clone(),
+        title: window.title.clone(),
+        visible: window.visible,
+        transparent: window.transparent,
+        decorations: window.decorations,
+        multitouch: window.multitouch,
+        resize_callback: window.resize_callback,
+        parent: Some(maybe_parent as *mut c_void),
+    };
+
     // Creating a mutex to track the current window state
     let window_state = Arc::new(Mutex::new(WindowState {
         cursor: winapi::IDC_ARROW, // use arrow by default
@@ -186,7 +214,7 @@ unsafe fn init(title: Vec<u16>, window: &WindowAttributes, pl_attribs: PlatformS
                 window_state: window_state.clone(),
                 mouse_in_window: false
             };
-            (*context_stash.borrow_mut()) = Some(data);
+            (*context_stash.borrow_mut()).insert(real_window.0, data);
         });
         rx
     };
@@ -256,4 +284,74 @@ unsafe fn switch_to_fullscreen(rect: &mut winapi::RECT, monitor: &MonitorId)
     }
 
     Ok(())
+}
+
+#[derive(Clone)]
+struct WindowAttributes2 {
+    /// The dimensions of the window. If this is `None`, some platform-specific dimensions will be
+    /// used.
+    ///
+    /// The default is `None`.
+    pub dimensions: Option<(u32, u32)>,
+
+    /// The minimum dimensions a window can be, If this is `None`, the window will have no minimum dimensions (aside from reserved).
+    ///
+    /// The default is `None`.
+    pub min_dimensions: Option<(u32, u32)>,
+
+    /// The maximum dimensions a window can be, If this is `None`, the maximum will have no maximum or will be set to the primary monitor's dimensions by the platform.
+    ///
+    /// The default is `None`.
+    pub max_dimensions: Option<(u32, u32)>,
+
+    /// If `Some`, the window will be in fullscreen mode with the given monitor.
+    ///
+    /// The default is `None`.
+    pub monitor: Option<platform::MonitorId>,
+
+    /// The title of the window in the title bar.
+    ///
+    /// The default is `"glutin window"`.
+    pub title: String,
+
+    /// Whether the window should be immediately visible upon creation.
+    ///
+    /// The default is `true`.
+    pub visible: bool,
+
+    /// Whether the the window should be transparent. If this is true, writing colors
+    /// with alpha values different than `1.0` will produce a transparent window.
+    ///
+    /// The default is `false`.
+    pub transparent: bool,
+
+    /// Whether the window should have borders and bars.
+    ///
+    /// The default is `true`.
+    pub decorations: bool,
+
+    /// [iOS only] Enable multitouch, see [UIView#multipleTouchEnabled]
+    /// (https://developer.apple.com/library/ios/documentation/UIKit/Reference/UIView_Class/#//apple_ref/occ/instp/UIView/multipleTouchEnabled)
+    pub multitouch: bool,
+
+    /// A function called upon resizing, necessary to receive resize events on Mac and possibly
+    /// other systems.
+    pub resize_callback: Option<fn(u32, u32)>,
+}
+
+impl From<WindowAttributes> for WindowAttributes2{
+    fn from(window: WindowAttributes) -> WindowAttributes2{
+        WindowAttributes2 {
+            dimensions: window.dimensions,
+            min_dimensions: window.min_dimensions,
+            max_dimensions: window.max_dimensions,
+            monitor: window.monitor,
+            title: window.title,
+            visible: window.visible,
+            transparent: window.transparent,
+            decorations: window.decorations,
+            multitouch: window.multitouch,
+            resize_callback: window.resize_callback,
+        }
+    }
 }
