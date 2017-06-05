@@ -350,6 +350,9 @@ impl Window {
 impl Drop for Window {
     #[inline]
     fn drop(&mut self) {
+        callback::CONTEXT_STASH.with(|context_stash| {
+            (*context_stash.borrow_mut()).remove(&self.window.0)/*.unwrap()*/;
+        });
         unsafe {
             user32::PostMessageW(self.window.0, winapi::WM_DESTROY, 0, 0);
         }

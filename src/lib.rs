@@ -65,6 +65,8 @@ pub use window::{WindowProxy, PollEventsIterator, WaitEventsIterator};
 pub use window::{AvailableMonitorsIter, MonitorId, get_available_monitors, get_primary_monitor};
 pub use native_monitor::NativeMonitorId;
 
+use std::os::raw::c_void;
+
 mod api;
 mod platform;
 mod events;
@@ -221,7 +223,7 @@ pub struct WindowAttributes {
     pub dimensions: Option<(u32, u32)>,
 
     /// Window parent handle.
-    pub parent: Option<*mut libc::c_void>,
+    pub parent: Option<*mut c_void>,
 
     /// The minimum dimensions a window can be, If this is `None`, the window will have no minimum dimensions (aside from reserved).
     ///
