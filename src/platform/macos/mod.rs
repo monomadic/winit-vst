@@ -175,6 +175,27 @@ pub struct Window {
 unsafe impl Send for Window {}
 unsafe impl Sync for Window {}
 
+impl Drop for Window {
+    fn drop(&mut self) {
+        // Remove this window from the `EventLoop`s list of windows.
+        // let id = self.id();
+        // if let Some(ev) = self.delegate.state.events_loop.upgrade() {
+        //     ev.find_and_remove_window(id);
+        // }
+
+        // Close the window if it has not yet been closed.
+        let nswindow = *self.window;
+        if nswindow != nil {
+            unsafe {
+                msg_send![nswindow, close];
+            }
+        }
+
+        // Retain the window, rather than deleting it.
+        IdRef::retain(self.window.0);
+    }
+}
+
 impl WindowExt for Window {
     #[inline]
     fn get_nswindow(&self) -> *mut c_void {
@@ -331,13 +352,6 @@ impl Window {
                 unsafe {
                     window.makeKeyAndOrderFront_(nil);
                 };
-
-                // view = unsafe {
-                //     let v = IdRef::new(parent as id);
-                //     v.setWantsBestResolutionOpenGLSurface_(YES);
-                //     window.setContentView_(*v);
-                //     v
-                // };
 
             },
             None => {
