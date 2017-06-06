@@ -275,6 +275,32 @@ impl<'a> Iterator for WaitEventsIterator<'a> {
     }
 }
 
+// ADDITIONAL FUNCTIONS FOR VST
+
+pub unsafe fn attach_component_to_parent(view: id) -> id {
+    use cocoa::appkit::NSView;
+
+    // create and attach the child view.
+    let child_nsview = NSView::alloc(nil);
+    let child_view = child_nsview.initWithFrame_(host_window_frame(view));
+    add_subview(view, child_view);
+
+    child_view
+}
+
+/// - (void)addSubview:(UIView *)view;
+pub unsafe fn add_subview(parent_id: id, child_id: id) {
+    msg_send![parent_id, addSubview:child_id];
+}
+
+/// @property NSRect frame;
+pub unsafe fn host_window_frame(view: id) -> NSRect {
+    use cocoa::appkit::NSView;
+    NSView::frame(view)
+}
+
+// END ADDITIONAL FUNCTIONS FOR VST
+
 impl Window {
     pub fn new(win_attribs: &WindowAttributes,
                pl_attribs: &PlatformSpecificWindowBuilderAttributes)
@@ -286,22 +312,32 @@ impl Window {
 
         match win_attribs.parent {
             Some(parent) => {
-                // view = IdRef::new(parent as id);
-                window = IdRef::new(unsafe { msg_send![parent as id, window] });
-                // view = IdRef::new(nil);
-                // window = IdRef::new(nil);
 
-                // return Err(OsError(format!("Couldn't create NSView")));
+                use cocoa;
+
+                // IdRefs call release on the object once we're done with it.
+                // On 64bit VSTs, we are given an NSView.
+                // let view = IdRef::new(parent as id);
+                view = IdRef::new(unsafe { attach_component_to_parent(parent as id) });
+                unsafe { view.setWantsBestResolutionOpenGLSurface_(YES) };
+
+                // Get the parent window of the NSView we're given.
+                let ns_window_ptr: cocoa::base::id = unsafe { msg_send![parent as cocoa::base::id, window] };
+
+                // Wrap it in an IdRef.
+                window = IdRef::new(ns_window_ptr as id);
+                unsafe { window.setContentView_(*view) };
+        
                 unsafe {
                     window.makeKeyAndOrderFront_(nil);
                 };
 
-                view = unsafe {
-                    let v = IdRef::new(parent as id);
-                    v.setWantsBestResolutionOpenGLSurface_(YES);
-                    window.setContentView_(*v);
-                    v
-                };
+                // view = unsafe {
+                //     let v = IdRef::new(parent as id);
+                //     v.setWantsBestResolutionOpenGLSurface_(YES);
+                //     window.setContentView_(*v);
+                //     v
+                // };
 
             },
             None => {
