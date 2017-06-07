@@ -190,9 +190,6 @@ impl Drop for Window {
                 msg_send![nswindow, close];
             }
         }
-
-        // Retain the window, rather than deleting it.
-        IdRef::retain(self.window.0);
     }
 }
 
@@ -792,9 +789,9 @@ impl IdRef {
 
 impl Drop for IdRef {
     fn drop(&mut self) {
-        if self.0 != nil {
-            let _: () = unsafe { msg_send![self.0, release] };
-        }
+        // if self.0 != nil {
+        //     let _: () = unsafe { msg_send![self.0, release] };
+        // }
     }
 }
 
