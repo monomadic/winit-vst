@@ -330,26 +330,21 @@ impl Window {
 
         match win_attribs.parent {
             Some(parent) => {
-
                 use cocoa;
 
                 // IdRefs call release on the object once we're done with it.
                 // On 64bit VSTs, we are given an NSView.
-                // let view = IdRef::new(parent as id);
+                // view = IdRef::new(parent as id);
                 view = IdRef::new(unsafe { attach_component_to_parent(parent as id) });
-                unsafe { view.setWantsBestResolutionOpenGLSurface_(YES) };
 
                 // Get the parent window of the NSView we're given.
-                let ns_window_ptr: cocoa::base::id = unsafe { msg_send![parent as cocoa::base::id, window] };
+                window = IdRef::new(unsafe { msg_send![parent as cocoa::base::id, window] });
 
-                // Wrap it in an IdRef.
-                window = IdRef::new(ns_window_ptr as id);
-                unsafe { window.setContentView_(*view) };
-        
                 unsafe {
+                    view.setWantsBestResolutionOpenGLSurface_(YES);
+                    window.setContentView_(*view);
                     window.makeKeyAndOrderFront_(nil);
                 };
-
             },
             None => {
                 app = match Window::create_app(pl_attribs.activation_policy) {
