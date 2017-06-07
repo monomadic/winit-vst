@@ -23,6 +23,14 @@
 //!
 //! By default only `window` is enabled.
 
+#[macro_use] 
+extern crate log;
+extern crate simplelog;
+extern crate log_panics;
+
+use simplelog::*;
+use std::fs::File;
+
 #[macro_use]
 extern crate lazy_static;
 

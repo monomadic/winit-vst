@@ -39,6 +39,9 @@ static mut CTRL_PRESSED: bool = false;
 static mut WIN_PRESSED: bool = false;
 static mut ALT_PRESSED: bool = false;
 
+use simplelog::*;
+use std::fs::File;
+
 struct DelegateState {
     view: IdRef,
     window: IdRef,
@@ -61,6 +64,7 @@ impl WindowDelegate {
         use std::sync::{Once, ONCE_INIT};
 
         extern fn window_should_close(this: &Object, _: Sel, _: id) -> BOOL {
+            info!("window should close!");
             unsafe {
                 let state: *mut c_void = *this.get_ivar("glutinState");
                 let state = state as *mut DelegateState;
@@ -143,6 +147,7 @@ impl WindowDelegate {
         let state_ptr: *mut DelegateState = &mut *state;
         unsafe {
             let delegate = IdRef::new(msg_send![WindowDelegate::class(), new]);
+            info!("window delegate id: {}", delegate.0 as i32);
 
             (&mut **delegate).set_ivar("glutinState", state_ptr as *mut ::std::os::raw::c_void);
             let _: () = msg_send![*state.window, setDelegate:*delegate];
@@ -155,8 +160,10 @@ impl WindowDelegate {
 impl Drop for WindowDelegate {
     fn drop(&mut self) {
         unsafe {
+            info!("dropping delegate.");
             // Nil the window's delegate so it doesn't still reference us
             let _: () = msg_send![*self.state.window, setDelegate:nil];
+            info!("dropped delegate.");
         }
     }
 }
@@ -177,22 +184,34 @@ unsafe impl Sync for Window {}
 
 impl Drop for Window {
     fn drop(&mut self) {
+        
         // Remove this window from the `EventLoop`s list of windows.
         // let id = self.id();
         // if let Some(ev) = self.delegate.state.events_loop.upgrade() {
         //     ev.find_and_remove_window(id);
         // }
 
+        info!("attempting to drop window.");
+
         // Close the window if it has not yet been closed.
         let nswindow = *self.window;
+        let nsview = *self.view;
+
         if nswindow != nil {
             unsafe {
+                info!("attempting close.");
                 msg_send![nswindow, close];
+                // info!("attempting removeChildWindow.");
+                // msg_send![nswindow, removeChildWindow];
+                info!("attempting removeFromSuperview.");
+                msg_send![nsview, removeFromSuperview];
             }
         }
 
-        // Retain the window, rather than deleting it.
-        IdRef::retain(self.window.0);
+        info!("done.");
+
+        // self.view.deref();
+        // self.window.deref();
     }
 }
 
@@ -331,25 +350,42 @@ impl Window {
         let window;
         let view;
 
+        let _ = CombinedLogger::init(
+            vec![
+                WriteLogger::new(LogLevelFilter::Info, Config::default(), File::create("/tmp/simplesynth.log").unwrap()),
+            ]
+        );
+
+        use log_panics;
+        log_panics::init();
+
+        info!("winit called.");
+
         match win_attribs.parent {
             Some(parent) => {
 
                 use cocoa;
 
+                info!("handle view id: {}", parent as i32);
+
                 // IdRefs call release on the object once we're done with it.
                 // On 64bit VSTs, we are given an NSView.
-                // let view = IdRef::new(parent as id);
-                view = IdRef::new(unsafe { attach_component_to_parent(parent as id) });
+                // Need to create a new NSView child on the one we are given.
+                view = IdRef::new(parent as id);
+                // view = IdRef::new(unsafe { attach_component_to_parent(parent as id) });
+                info!("child view id: {}", view.0 as i32);
                 unsafe { view.setWantsBestResolutionOpenGLSurface_(YES) };
 
                 // Get the parent window of the NSView we're given.
                 let ns_window_ptr: cocoa::base::id = unsafe { msg_send![parent as cocoa::base::id, window] };
+                info!("window id: {}", ns_window_ptr as i32);
 
                 // Wrap it in an IdRef.
-                window = IdRef::new(ns_window_ptr as id);
+                window = IdRef::retain(ns_window_ptr as id);
                 unsafe { window.setContentView_(*view) };
         
                 unsafe {
+                    window.setReleasedWhenClosed_(YES);
                     window.makeKeyAndOrderFront_(nil);
                 };
 
@@ -394,10 +430,9 @@ impl Window {
             }
         }
 
-
         let ds = DelegateState {
             view: view.clone(),
-            window: window.clone(),
+            window: IdRef(nil),
             resize_handler: None,
             pending_resize: Mutex::new(None),
             pending_events: Mutex::new(VecDeque::new()),
@@ -492,7 +527,7 @@ impl Window {
             ));
             window.non_nil().map(|window| {
                 let title = IdRef::new(NSString::alloc(nil).init_str(&attrs.title));
-                window.setReleasedWhenClosed_(NO);
+                window.setReleasedWhenClosed_(YES);
                 window.setTitle_(*title);
                 window.setAcceptsMouseMovedEvents_(YES);
 
@@ -793,7 +828,15 @@ impl IdRef {
 impl Drop for IdRef {
     fn drop(&mut self) {
         if self.0 != nil {
+            info!("dropping: {}", self.0 as i32);
             let _: () = unsafe { msg_send![self.0, release] };
+            self.0 = nil;
+            // if self.0 != nil {
+            //     info!("retain detected. {}", self.0 as i32);
+            //     let _: () = unsafe { msg_send![self.0, release] };
+            // } else {
+            //     info!("full drop detected.");
+            // }
         }
     }
 }
