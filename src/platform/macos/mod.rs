@@ -65,8 +65,10 @@ impl WindowDelegate {
                 let state: *mut c_void = *this.get_ivar("glutinState");
                 let state = state as *mut DelegateState;
                 (*state).pending_events.lock().unwrap().push_back(Event::Closed);
+                // NSObject::release((*state).window.0);
+                // msg_send![(*state).window.0, release];
             }
-            YES
+            NO // because winit sucks.
         }
 
         extern fn window_did_resize(this: &Object, _: Sel, _: id) {
@@ -344,6 +346,9 @@ impl Window {
                     view.setWantsBestResolutionOpenGLSurface_(YES);
                     window.setContentView_(*view);
                     window.makeKeyAndOrderFront_(nil);
+                    window.setReleasedWhenClosed_(YES);
+                    window.setAcceptsMouseMovedEvents_(YES);
+                    window.center();
                 };
             },
             None => {
@@ -784,9 +789,9 @@ impl IdRef {
 
 impl Drop for IdRef {
     fn drop(&mut self) {
-        // if self.0 != nil {
-        //     let _: () = unsafe { msg_send![self.0, release] };
-        // }
+        if self.0 != nil {
+            // let _: () = unsafe { msg_send![self.0, release] };
+        }
     }
 }
 
