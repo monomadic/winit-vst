@@ -65,12 +65,39 @@ impl WindowDelegate {
 
         extern fn window_should_close(this: &Object, _: Sel, _: id) -> BOOL {
             info!("window should close!");
+            // unsafe {
+            //     let state: *mut c_void = *this.get_ivar("glutinState");
+            //     let state = state as *mut DelegateState;
+            //     (*state).pending_events.lock().unwrap().push_back(Event::Closed);
+            // }
+            // YES
+
             unsafe {
                 let state: *mut c_void = *this.get_ivar("glutinState");
                 let state = state as *mut DelegateState;
                 (*state).pending_events.lock().unwrap().push_back(Event::Closed);
+                // NSObject::release((*state).window.0);
+
+                // NSView::remove((*state).window);
+
+                // find_and_remove_window()
+
+                // let view = (*state).view.0;
+                // msg_send![(*state).view.0, removeFromSuperView];
+                // msg_send![*w, close];
+
+                unsafe fn superview(view: id) -> id {
+                    msg_send![view, superview]
+                }
+
+                let superview = superview((*state).view.0);
+                msg_send![superview as id, removeFromSuperView];
+                msg_send![superview as id, release];
+                msg_send![(*state).window.0, close];
+                msg_send![(*state).window.0, release];
+
             }
-            YES
+            YES // close window?
         }
 
         extern fn window_did_resize(this: &Object, _: Sel, _: id) {
