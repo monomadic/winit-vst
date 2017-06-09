@@ -407,11 +407,12 @@ impl Window {
                 let ns_window_ptr: cocoa::base::id = unsafe { msg_send![parent as cocoa::base::id, window] };
                 info!("window id: {}", ns_window_ptr as i32);
 
-                // Wrap it in an IdRef.
+                // Wrap it in an IdRef. Retain it - releasing this (by calling new) causes a crash
+                // upon re-opening the gui window.
                 window = IdRef::retain(ns_window_ptr as id);
-                unsafe { window.setContentView_(*view) };
-        
+                
                 unsafe {
+                    window.setContentView_(*view);
                     window.setReleasedWhenClosed_(YES);
                     window.makeKeyAndOrderFront_(nil);
                 };
