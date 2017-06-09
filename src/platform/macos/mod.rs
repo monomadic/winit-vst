@@ -73,9 +73,9 @@ impl WindowDelegate {
 
                 let superview = superview((*state).view.0);
                 msg_send![superview as id, removeFromSuperView];
-                msg_send![superview as id, release];
+                // msg_send![superview as id, release];
                 msg_send![(*state).window.0, close];
-                msg_send![(*state).window.0, release];
+                // msg_send![(*state).window.0, release];
 
             }
             YES // close window?
@@ -186,28 +186,6 @@ pub struct Window {
 
 unsafe impl Send for Window {}
 unsafe impl Sync for Window {}
-
-impl Drop for Window {
-    fn drop(&mut self) {
-        
-        // Remove this window from the `EventLoop`s list of windows.
-        // let id = self.id();
-        // if let Some(ev) = self.delegate.state.events_loop.upgrade() {
-        //     ev.find_and_remove_window(id);
-        // }
-
-        // Close the window if it has not yet been closed.
-        let nswindow = *self.window;
-        let nsview = *self.view;
-
-        if nswindow != nil {
-            unsafe {
-                msg_send![nswindow, close];
-                msg_send![nsview, removeFromSuperview];
-            }
-        }
-    }
-}
 
 impl WindowExt for Window {
     #[inline]
@@ -352,8 +330,8 @@ impl Window {
                 // IdRefs call release on the object once we're done with it.
                 // On 64bit VSTs, we are given an NSView.
                 // Need to create a new NSView child on the one we are given.
-                view = IdRef::new(parent as id);
-                // view = IdRef::new(unsafe { attach_component_to_parent(parent as id) });
+                // view = IdRef::new(parent as id);
+                view = IdRef::new(unsafe { attach_component_to_parent(parent as id) });
 
                 unsafe { view.setWantsBestResolutionOpenGLSurface_(YES) };
 
