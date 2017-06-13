@@ -403,6 +403,20 @@ impl Window {
             delegate: WindowDelegate::new(ds),
         };
 
+        // mTimer = [NSTimer timerWithTimeInterval:sec
+        //      target:self selector:@selector(onTimer:) userInfo:nil repeats:YES];
+        // [[NSRunLoop currentRunLoop] addTimer: mTimer forMode: (NSString*) kCFRunLoopCommonModes];
+
+        use cocoa;
+
+        extern fn on_timer(this: &Object, _: Sel, _: id) {
+        }
+
+        let timer = msg_send![cocoa::base::class("NSTimer"), timerWithTimeInterval:0.016
+            target:window.view.0 selector:sel!(onTimer:) userInfo: nil  repeats:YES];
+
+        window.delegate.add_method(sel!(onTimer:), on_timer as extern fn(&Object, Sel, id));
+
         Ok(window)
     }
 
