@@ -62,7 +62,10 @@ impl WindowDelegate {
 
         extern fn window_should_close(this: &Object, _: Sel, _: id) -> BOOL {
             // MARK: Vst Edit: closing window
+            info!("window_should_close() delegate called.");
+
             unsafe {
+                info!("doing unsafe stuff");
                 let state: *mut c_void = *this.get_ivar("glutinState");
                 let state = state as *mut DelegateState;
                 (*state).pending_events.lock().unwrap().push_back(Event::Closed);
@@ -72,9 +75,12 @@ impl WindowDelegate {
                 }
 
                 let superview = superview((*state).view.0);
-                msg_send![superview as id, removeFromSuperView];
+                // msg_send![superview as id, removeFromSuperView];
                 // msg_send![superview as id, release];
-                msg_send![(*state).window.0, close];
+
+                let window_id = (*state).window.0;
+                info!("-- window id should be: {:?}", window_id);
+                msg_send![window_id, close];
                 // msg_send![(*state).window.0, release];
 
             }
@@ -169,13 +175,23 @@ impl WindowDelegate {
 impl Drop for WindowDelegate {
     fn drop(&mut self) {
         unsafe {
+            // MARK: Vst Edit: dropping window delegate.
             info!("dropping delegate.");
             // Nil the window's delegate so it doesn't still reference us
             let _: () = msg_send![*self.state.window, setDelegate:nil];
             info!("dropped delegate.");
+            // End Vst Edit: dropping window delegate.
         }
     }
 }
+
+// MARK: Vst Edit: drop for window.
+impl Drop for Window {
+    fn drop(&mut self) {
+        info!("dropping window. window.id:{:?} view.id:{:?}", self.window.0, self.view.0);
+    }
+}
+// End Vst Edit: drop for window.
 
 #[derive(Clone, Default)]
 pub struct PlatformSpecificWindowBuilderAttributes {
@@ -346,7 +362,7 @@ impl Window {
 
                 use cocoa;
 
-                info!("handle view id: {}", parent as i32);
+                info!("-- handle view id: {:?}", parent);
 
                 // IdRefs call release on the object once we're done with it.
                 // On 64bit VSTs, we are given an NSView.
@@ -358,7 +374,7 @@ impl Window {
 
                 // Get the parent window of the NSView we're given.
                 let ns_window_ptr: cocoa::base::id = unsafe { msg_send![parent as cocoa::base::id, window] };
-                info!("window id: {}", ns_window_ptr as i32);
+                info!("-- window id: {:?}", ns_window_ptr);
 
                 // Wrap it in an IdRef. Retain it - releasing this (by calling new) causes a crash
                 // upon re-opening the gui window.
@@ -413,7 +429,8 @@ impl Window {
 
         let ds = DelegateState {
             view: view.clone(),
-            window: IdRef(nil),
+            window: window.clone(), // preventing window closing.
+            // window: IdRef(nil), // window closes, but won't open again as event loop still running. no close event sent.
             resize_handler: None,
             pending_resize: Mutex::new(None),
             pending_events: Mutex::new(VecDeque::new()),
@@ -812,7 +829,7 @@ impl Drop for IdRef {
         if self.0 != nil {
             // MARK: Vst Edit - close window helper function.
             info!("dropping: {}", self.0 as i32);
-            let _: () = unsafe { msg_send![self.0, release] };
+            // let _: () = unsafe { msg_send![self.0, release] };
             self.0 = nil;
             // if self.0 != nil {
             //     info!("retain detected. {}", self.0 as i32);
