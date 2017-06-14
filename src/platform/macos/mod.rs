@@ -64,33 +64,11 @@ impl WindowDelegate {
         use std::sync::{Once, ONCE_INIT};
 
         extern fn window_should_close(this: &Object, _: Sel, _: id) -> BOOL {
-<<<<<<< HEAD
-            info!("window should close!");
-            // unsafe {
-            //     let state: *mut c_void = *this.get_ivar("glutinState");
-            //     let state = state as *mut DelegateState;
-            //     (*state).pending_events.lock().unwrap().push_back(Event::Closed);
-            // }
-            // YES
-=======
->>>>>>> master
 
             unsafe {
                 let state: *mut c_void = *this.get_ivar("glutinState");
                 let state = state as *mut DelegateState;
                 (*state).pending_events.lock().unwrap().push_back(Event::Closed);
-<<<<<<< HEAD
-                // NSObject::release((*state).window.0);
-
-                // NSView::remove((*state).window);
-
-                // find_and_remove_window()
-
-                // let view = (*state).view.0;
-                // msg_send![(*state).view.0, removeFromSuperView];
-                // msg_send![*w, close];
-=======
->>>>>>> master
 
                 unsafe fn superview(view: id) -> id {
                     msg_send![view, superview]
@@ -98,15 +76,9 @@ impl WindowDelegate {
 
                 let superview = superview((*state).view.0);
                 msg_send![superview as id, removeFromSuperView];
-<<<<<<< HEAD
-                msg_send![superview as id, release];
-                msg_send![(*state).window.0, close];
-                msg_send![(*state).window.0, release];
-=======
                 // msg_send![superview as id, release];
                 msg_send![(*state).window.0, close];
                 // msg_send![(*state).window.0, release];
->>>>>>> master
 
             }
             YES // close window?
@@ -221,42 +193,6 @@ pub struct Window {
 unsafe impl Send for Window {}
 unsafe impl Sync for Window {}
 
-<<<<<<< HEAD
-impl Drop for Window {
-    fn drop(&mut self) {
-        
-        // Remove this window from the `EventLoop`s list of windows.
-        // let id = self.id();
-        // if let Some(ev) = self.delegate.state.events_loop.upgrade() {
-        //     ev.find_and_remove_window(id);
-        // }
-
-        info!("attempting to drop window.");
-
-        // Close the window if it has not yet been closed.
-        let nswindow = *self.window;
-        let nsview = *self.view;
-
-        if nswindow != nil {
-            unsafe {
-                info!("attempting close.");
-                msg_send![nswindow, close];
-                // info!("attempting removeChildWindow.");
-                // msg_send![nswindow, removeChildWindow];
-                info!("attempting removeFromSuperview.");
-                msg_send![nsview, removeFromSuperview];
-            }
-        }
-
-        info!("done.");
-
-        // self.view.deref();
-        // self.window.deref();
-    }
-}
-
-=======
->>>>>>> master
 impl WindowExt for Window {
     #[inline]
     fn get_nswindow(&self) -> *mut c_void {
@@ -413,15 +349,9 @@ impl Window {
                 // IdRefs call release on the object once we're done with it.
                 // On 64bit VSTs, we are given an NSView.
                 // Need to create a new NSView child on the one we are given.
-<<<<<<< HEAD
-                view = IdRef::new(parent as id);
-                // view = IdRef::new(unsafe { attach_component_to_parent(parent as id) });
-                info!("child view id: {}", view.0 as i32);
-=======
                 // view = IdRef::new(parent as id);
                 view = IdRef::new(unsafe { attach_component_to_parent(parent as id) });
 
->>>>>>> master
                 unsafe { view.setWantsBestResolutionOpenGLSurface_(YES) };
 
                 // Get the parent window of the NSView we're given.
