@@ -39,9 +39,6 @@ static mut CTRL_PRESSED: bool = false;
 static mut WIN_PRESSED: bool = false;
 static mut ALT_PRESSED: bool = false;
 
-use simplelog::*;
-use std::fs::File;
-
 struct DelegateState {
     view: IdRef,
     window: IdRef,
@@ -330,16 +327,19 @@ impl Window {
         let window;
         let view;
 
+        // logging
+        use simplelog::*;
+        use std::fs::File;
         let _ = CombinedLogger::init(
             vec![
                 WriteLogger::new(LogLevelFilter::Info, Config::default(), File::create("/tmp/simplesynth.log").unwrap()),
             ]
         );
+        info!("Winit logging started. Attaching new handle.");
+        // end logging
 
         use log_panics;
         log_panics::init();
-
-        info!("winit called.");
 
         match win_attribs.parent {
             Some(parent) => {
