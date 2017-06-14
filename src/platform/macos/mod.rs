@@ -64,7 +64,7 @@ impl WindowDelegate {
         use std::sync::{Once, ONCE_INIT};
 
         extern fn window_should_close(this: &Object, _: Sel, _: id) -> BOOL {
-
+            // MARK: Vst Edit: closing window
             unsafe {
                 let state: *mut c_void = *this.get_ivar("glutinState");
                 let state = state as *mut DelegateState;
@@ -82,6 +82,7 @@ impl WindowDelegate {
 
             }
             YES // close window?
+            // End Vst Edit: closing window
         }
 
         extern fn window_did_resize(this: &Object, _: Sel, _: id) {
@@ -293,7 +294,7 @@ impl<'a> Iterator for WaitEventsIterator<'a> {
     }
 }
 
-// ADDITIONAL FUNCTIONS FOR VST
+// MARK: Vst Edit - cocoa specific window functions.
 
 pub unsafe fn attach_component_to_parent(view: id) -> id {
     use cocoa::appkit::NSView;
@@ -317,13 +318,14 @@ pub unsafe fn host_window_frame(view: id) -> NSRect {
     NSView::frame(view)
 }
 
-// END ADDITIONAL FUNCTIONS FOR VST
+// End Vst Edit - cocoa specific window functions.
 
 impl Window {
     pub fn new(win_attribs: &WindowAttributes,
                pl_attribs: &PlatformSpecificWindowBuilderAttributes)
                -> Result<Window, CreationError>
     {
+        // MARK: Vst Edit - Attach the child window.
         let app;
         let window;
         let view;
@@ -424,6 +426,7 @@ impl Window {
         };
 
         Ok(window)
+        // End Vst Edit - Attach the child window.
     }
 
     fn create_app(activation_policy: ActivationPolicy) -> Option<id> {
@@ -807,6 +810,7 @@ impl IdRef {
 impl Drop for IdRef {
     fn drop(&mut self) {
         if self.0 != nil {
+            // MARK: Vst Edit - close window helper function.
             info!("dropping: {}", self.0 as i32);
             let _: () = unsafe { msg_send![self.0, release] };
             self.0 = nil;
@@ -816,6 +820,7 @@ impl Drop for IdRef {
             // } else {
             //     info!("full drop detected.");
             // }
+            // End Vst Edit - close window helper function.
         }
     }
 }
