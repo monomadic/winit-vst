@@ -73,8 +73,6 @@ impl WindowDelegate {
                 unsafe fn superview(view: id) -> id {
                     msg_send![view, superview]
                 }
-
-<<<<<<< HEAD
                 // let superview = superview((*state).view.0);
                 // msg_send![superview as id, removeFromSuperView];
                 // msg_send![superview as id, release];
@@ -93,7 +91,6 @@ impl WindowDelegate {
                 // let window_id = (*state).window.0;
                 // info!("-- window id should be: {:?}", window_id);
                 // msg_send![window_id, close];
-=======
                 let superview = superview((*state).view.0);
                 // msg_send![superview as id, removeFromSuperView];
                 // msg_send![superview as id, release];
@@ -102,7 +99,6 @@ impl WindowDelegate {
                 info!("-- window id should be: {:?}", window_id);
                 msg_send![window_id, close];
                 // msg_send![(*state).window.0, release];
->>>>>>> logging
 
             }
             YES // close window?
@@ -200,10 +196,7 @@ impl Drop for WindowDelegate {
             info!("dropping delegate.");
             // Nil the window's delegate so it doesn't still reference us
             let _: () = msg_send![*self.state.window, setDelegate:nil];
-<<<<<<< HEAD
             // let _: () = msg_send![*self.state.view, setDelegate:nil];
-=======
->>>>>>> logging
             info!("dropped delegate.");
             // End Vst Edit: dropping window delegate.
         }
@@ -214,10 +207,6 @@ impl Drop for WindowDelegate {
 impl Drop for Window {
     fn drop(&mut self) {
         info!("dropping window. window.id:{:?} view.id:{:?}", self.window.0, self.view.0);
-<<<<<<< HEAD
-
-=======
->>>>>>> logging
     }
 }
 // End Vst Edit: drop for window.
