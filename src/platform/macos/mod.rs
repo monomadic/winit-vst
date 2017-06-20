@@ -71,11 +71,24 @@ impl WindowDelegate {
                     msg_send![view, superview]
                 }
 
-                let superview = superview((*state).view.0);
-                msg_send![superview as id, removeFromSuperView];
+                // let superview = superview((*state).view.0);
+                // msg_send![superview as id, removeFromSuperView];
                 // msg_send![superview as id, release];
-                msg_send![(*state).window.0, close];
-                // msg_send![(*state).window.0, release];
+
+                // From Docs:
+                // The view is also released; if you plan to reuse it, be sure to retain
+                // it before sending this message and to release it as appropriate when
+                // adding it as a subview of another NSView.
+
+                // let view_id = (*state).view.0;
+                // msg_send![view_id, retain];
+                // info!("-- removeFromSuperView(view).");
+                // msg_send![view_id, removeFromSuperView]; // this doesn't work. silently fails.
+                // info!("-- removed view.");
+
+                // let window_id = (*state).window.0;
+                // info!("-- window id should be: {:?}", window_id);
+                // msg_send![window_id, close];
 
             }
             YES // close window?
@@ -169,9 +182,21 @@ impl Drop for WindowDelegate {
         unsafe {
             // Nil the window's delegate so it doesn't still reference us
             let _: () = msg_send![*self.state.window, setDelegate:nil];
+            // let _: () = msg_send![*self.state.view, setDelegate:nil];
+            info!("dropped delegate.");
+            // End Vst Edit: dropping window delegate.
         }
     }
 }
+
+// MARK: Vst Edit: drop for window.
+impl Drop for Window {
+    fn drop(&mut self) {
+        info!("dropping window. window.id:{:?} view.id:{:?}", self.window.0, self.view.0);
+
+    }
+}
+// End Vst Edit: drop for window.
 
 #[derive(Clone, Default)]
 pub struct PlatformSpecificWindowBuilderAttributes {
@@ -262,6 +287,7 @@ impl<'a> Iterator for WaitEventsIterator<'a> {
         }
 
         if let Some(ev) = self.window.delegate.state.pending_events.lock().unwrap().pop_front() {
+            info!("processing event: {:?}", ev);
             return Some(ev);
         }
 
@@ -344,7 +370,7 @@ impl Window {
                 
                 unsafe {
                     window.setContentView_(*view);
-                    window.setReleasedWhenClosed_(YES);
+                    // window.setReleasedWhenClosed_(YES); // NEVER ENABLE THIS ON VST.
                     window.makeKeyAndOrderFront_(nil);
                 };
 
@@ -486,7 +512,7 @@ impl Window {
             ));
             window.non_nil().map(|window| {
                 let title = IdRef::new(NSString::alloc(nil).init_str(&attrs.title));
-                window.setReleasedWhenClosed_(YES);
+                // window.setReleasedWhenClosed_(YES); // NEVER ENABLE THIS ON VST.
                 window.setTitle_(*title);
                 window.setAcceptsMouseMovedEvents_(YES);
 
