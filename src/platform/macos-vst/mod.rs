@@ -1,8 +1,5 @@
 #![cfg(target_os = "macos")]
 
-mod idref;
-use self::idref::IdRef;
-
 use cocoa::base::{id, nil, YES};
 
 use std::collections::VecDeque;
@@ -18,6 +15,14 @@ use libc;
 use std::os::raw::c_void;
 
 use os::macos::{ ActivationPolicy, WindowExt };
+
+mod idref;
+use self::idref::IdRef;
+
+mod responder;
+
+mod event_handler;
+pub use self::event_handler::*;
 
 #[derive(Clone, Default)]
 pub struct PlatformSpecificWindowBuilderAttributes {
@@ -95,8 +100,9 @@ impl<'a> Iterator for WaitEventsIterator<'a> {
 
 pub struct Window {
     window: IdRef,
+    host_view: IdRef,
     view: IdRef,
-    // host_view: id,
+    // controller: Controller,
 }
 
 impl WindowExt for Window {
@@ -135,16 +141,35 @@ impl Window {
             Some(parent) => {
                 let host_view_id = parent as id;
                 let window = unsafe{ msg_send![host_view_id, window] };
+                let view = unsafe { msg_send![responder::get_window_responder_class(), new] };
 
+                // pub struct MyController {}
+                // impl ViewController for MyController {
+                //     fn on_mouse_down(&mut self) {
+                //         info!("Yaaaas");
+                //     }
+                // }
+                // let mut controller = Controller::new(Box::new(MyController {}));
+                // set_view_controller(view, &mut controller);
+
+                // fn set_view_controller(view: id, controller: *mut Controller) {
+                //     unsafe {
+                //         msg_send![view, setViewController:(controller as *mut c_void)];
+                //     }
+                // }
+                
                 unsafe {
-                    NSWindow::setContentView_(window, host_view_id);
+                    NSView::addSubview_(host_view_id, view);
+                    NSWindow::setContentView_(window, view);
                     NSWindow::makeKeyAndOrderFront_(window, nil);
-                    NSView::setWantsBestResolutionOpenGLSurface_(host_view_id, YES)
+                    NSView::setWantsBestResolutionOpenGLSurface_(view, YES);
                 };
 
                 Ok(Window{
                     window: IdRef::retain(window),
-                    view: IdRef::retain(host_view_id),
+                    host_view: IdRef::retain(host_view_id),
+                    view: IdRef::new(view),
+                    // controller: controller,
                 })
             },
             None => Err(CreationError::OsError("Parent view is null.".to_string()))
