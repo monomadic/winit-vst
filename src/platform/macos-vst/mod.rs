@@ -3,7 +3,7 @@
 mod idref;
 use self::idref::IdRef;
 
-use cocoa::base::{id, nil};
+use cocoa::base::{id, nil, YES};
 
 use std::collections::VecDeque;
 use std::sync::Arc;
@@ -102,8 +102,6 @@ pub struct Window {
 impl WindowExt for Window {
     #[inline]
     fn get_nswindow(&self) -> *mut c_void {
-        // allocs a nil to send back. might break stuff later if they need the window.
-        // *IdRef::new(nil) as *mut c_void
         warn!("raw pointer to nswindow requested!");
         *self.window as *mut c_void
     }
@@ -121,14 +119,31 @@ impl Window {
                _: &PlatformSpecificWindowBuilderAttributes)
                 -> Result<Window, CreationError> {
 
+        use cocoa::appkit::{ NSWindow, NSView };
+
+        // logging
+        use simplelog::*;
+        use std::fs::File;
+        let _ = CombinedLogger::init(
+            vec![
+                WriteLogger::new(LogLevelFilter::Info, Config::default(), File::create("/tmp/simplesynth.log").unwrap()),
+            ]
+        );
+        info!("Winit logging started. Attaching new handle.");
+
         match win_attribs.parent {
             Some(parent) => {
                 let host_view_id = parent as id;
-                // let window = unsafe{ msg_send![host_view_id, window] };
+                let window = unsafe{ msg_send![host_view_id, window] };
+
+                unsafe {
+                    NSWindow::setContentView_(window, host_view_id);
+                    NSWindow::makeKeyAndOrderFront_(window, nil);
+                    NSView::setWantsBestResolutionOpenGLSurface_(host_view_id, YES)
+                };
 
                 Ok(Window{
-                    // window: IdRef::retain(window),
-                    window: IdRef::new(nil),
+                    window: IdRef::retain(window),
                     view: IdRef::retain(host_view_id),
                 })
             },
@@ -143,7 +158,14 @@ impl Window {
 
     #[inline]
     pub fn get_position(&self) -> Option<(i32, i32)> {
-        Some((0, 0))
+        unsafe {
+            use cocoa::appkit::NSWindow;
+            use cocoa::foundation::{ NSRect, NSPoint, NSSize };
+            use core_graphics::display::{ CGDisplayPixelsHigh, CGMainDisplayID };
+
+            let content_rect = NSWindow::contentRectForFrameRect_(*self.window, NSWindow::frame(*self.window));
+            Some((content_rect.origin.x as i32, (CGDisplayPixelsHigh(CGMainDisplayID()) as f64 - (content_rect.origin.y + content_rect.size.height)) as i32))
+        }
     }
 
     #[inline]
@@ -161,11 +183,20 @@ impl Window {
 
     #[inline]
     pub fn get_outer_size(&self) -> Option<(u32, u32)> {
-        self.get_inner_size()
+        use cocoa::appkit::NSWindow;
+        unsafe {
+            let window_frame = NSWindow::frame(*self.window);
+            Some((window_frame.size.width as u32, window_frame.size.height as u32))
+        }
     }
 
     #[inline]
     pub fn set_inner_size(&self, width: u32, height: u32) {
+        use cocoa::appkit::NSWindow;
+        use cocoa::foundation::NSSize;
+        unsafe {
+            NSWindow::setContentSize_(*self.window, NSSize::new(width as f64, height as f64));
+        }
     }
 
     #[inline]
@@ -199,7 +230,8 @@ impl Window {
 
     #[inline]
     pub fn platform_window(&self) -> *mut libc::c_void {
-        unimplemented!()
+        warn!("platform_window() requested!");
+        *self.window as *mut libc::c_void
     }
 
     #[inline]
@@ -217,7 +249,10 @@ impl Window {
 
     #[inline]
     pub fn hidpi_factor(&self) -> f32 {
-        1.0
+        use cocoa::appkit::NSWindow;
+        unsafe {
+            NSWindow::backingScaleFactor(*self.window) as f32
+        }
     }
 
     #[inline]
