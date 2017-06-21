@@ -1,6 +1,7 @@
 #![cfg(target_os = "macos")]
 
-use cocoa::base::{id, nil, YES};
+use cocoa::base::{id, nil, YES, NO, SEL, class};
+use objc;
 
 use std::collections::VecDeque;
 use std::sync::Arc;
@@ -103,6 +104,16 @@ pub struct Window {
     host_view: IdRef,
     view: IdRef,
     // controller: Controller,
+    timer: IdRef,
+}
+
+impl Drop for Window {
+    fn drop(&mut self) {
+        info!("dropping window.");
+        info!("invalidating timer...");
+        unsafe { msg_send![*self.timer, invalidate] };
+        info!("stopped timer!");
+    }
 }
 
 impl WindowExt for Window {
@@ -135,6 +146,8 @@ impl Window {
                 WriteLogger::new(LogLevelFilter::Info, Config::default(), File::create("/tmp/simplesynth.log").unwrap()),
             ]
         );
+        use log_panics;
+        log_panics::init();
         info!("Winit logging started. Attaching new handle.");
 
         match win_attribs.parent {
@@ -157,6 +170,21 @@ impl Window {
                 //         msg_send![view, setViewController:(controller as *mut c_void)];
                 //     }
                 // }
+
+                use objc::runtime::{Class};
+
+                info!("creating timer");
+                let timer: id = unsafe { msg_send![ Class::get("NSTimer").unwrap(),
+                        scheduledTimerWithTimeInterval:0.2
+                        target:view
+                        selector:sel!(timerFired:)
+                        userInfo:nil
+                        repeats:YES
+                    ]
+                };
+                info!("timer created.");
+                // Timer { id: IdRef::new(timer) };
+                // unsafe { msg_send![*self.timer, invalidate] };
                 
                 unsafe {
                     NSView::addSubview_(host_view_id, view);
@@ -170,6 +198,7 @@ impl Window {
                     host_view: IdRef::retain(host_view_id),
                     view: IdRef::new(view),
                     // controller: controller,
+                    timer: IdRef::retain(timer),
                 })
             },
             None => Err(CreationError::OsError("Parent view is null.".to_string()))
@@ -250,7 +279,7 @@ impl Window {
 
     #[inline]
     pub fn platform_display(&self) -> *mut libc::c_void {
-        unimplemented!()
+        *self.view as *mut libc::c_void
     }
 
     #[inline]

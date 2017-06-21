@@ -24,6 +24,7 @@ pub fn get_window_responder_class() -> *const Class {
         // decl.add_ivar::<*mut c_void>("ViewController");
         // decl.add_ivar::<*mut c_void>("EventCallbacks");
         decl.add_ivar::<*mut c_void>("eventHandler");
+        decl.add_ivar::<*mut c_void>("theTimer");
 
         // extern "C" fn setViewController(this: &mut Object, _: Sel, controller: *mut c_void) {
         //     unsafe {
@@ -46,6 +47,20 @@ pub fn get_window_responder_class() -> *const Class {
         extern "C" fn acceptsFirstMouse(_: &Object, _: Sel, theEvent: id) -> BOOL {
             info!("acceptsFirstMouse() hit");
             YES
+        }
+
+        extern "C" fn timerFired(_: &Object, _: Sel, _: id) {
+            info!("timer fired - PING!");
+        }
+
+        extern "C" fn startTimer(_: &Object, _: Sel) {
+            info!("stopping timer.");
+            // unsafe { msg_send![, release] };
+        }
+
+        extern "C" fn stopTimer(_: &Object, _: Sel) {
+            info!("stopping timer.");
+            // unsafe { msg_send![, release] };
         }
 
         extern "C" fn mouseEvent(this: &Object, _: Sel, mouseEvent: id) {
@@ -75,6 +90,12 @@ pub fn get_window_responder_class() -> *const Class {
 
         decl.add_method(sel!(acceptsFirstMouse:),
             acceptsFirstMouse as extern fn(this: &Object, _: Sel, _: id) -> BOOL);
+
+        decl.add_method(sel!(timerFired:),
+            timerFired as extern fn(this: &Object, _: Sel, _: id));
+
+        // decl.add_method(sel!(stopTimer),
+        //     stopTimer as extern fn(this: &Object, _: Sel));
 
         // func mouseDown(with event: NSEvent)
         // https://developer.apple.com/documentation/appkit/nsresponder/1524634-mousedown
