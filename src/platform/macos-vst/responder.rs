@@ -8,14 +8,17 @@ use objc::declare::ClassDecl;
 
 use std::os::raw::c_void;
 
-use platform::platform::event_handler::*;
+use platform::platform::event_responder::*;
 
+// pub fn get_window_responder_class<T>(responder: T) -> *const Class where T : EventResponder {
 pub fn get_window_responder_class() -> *const Class {
 
     use std::sync::{Once, ONCE_INIT};
 
     static mut RESPONDER_CLASS: *const Class = 0 as *const Class;
     static INIT: Once = ONCE_INIT;
+
+    // let callback = fn foo() { info!("hi"); };
 
     INIT.call_once(|| unsafe {
         let superclass = Class::get("NSView").unwrap();
@@ -24,7 +27,7 @@ pub fn get_window_responder_class() -> *const Class {
         // decl.add_ivar::<*mut c_void>("ViewController");
         // decl.add_ivar::<*mut c_void>("EventCallbacks");
         decl.add_ivar::<*mut c_void>("eventHandler");
-        decl.add_ivar::<*mut c_void>("theTimer");
+        // decl.add_ivar::<*mut c_void>("theTimer");
 
         // extern "C" fn setViewController(this: &mut Object, _: Sel, controller: *mut c_void) {
         //     unsafe {
@@ -51,6 +54,8 @@ pub fn get_window_responder_class() -> *const Class {
 
         extern "C" fn timerFired(_: &Object, _: Sel, _: id) {
             info!("timer fired - PING!");
+            // event_responder.handle_event();
+
         }
 
         extern "C" fn startTimer(_: &Object, _: Sel) {
@@ -67,12 +72,12 @@ pub fn get_window_responder_class() -> *const Class {
             use cocoa::appkit::NSEvent;
             info!("NSEvent type: {:?}", unsafe { NSEvent::eventType(mouseEvent) });
 
-            unsafe {
-                let handler: *mut c_void = *this.get_ivar("eventHandler");
-                let mut handler = handler as *mut EventHandler;
+            // unsafe {
+            //     let handler: *mut c_void = *this.get_ivar("eventHandler");
+            //     let mut handler = handler as *mut T;
 
-                (*handler).handle_event();
-            }
+            //     (*handler).handle_event();
+            // }
 
             // Note: to get raw event type (for events unsupported by cocoa-rs),
             // let event: u64 = unsafe { msg_send![mouseEvent, type] };

@@ -1,29 +1,26 @@
 #![cfg(target_os = "macos")]
 
-use cocoa::base::{id, nil, YES, NO, SEL, class};
 use objc;
+use cocoa::base::{id, nil, YES, NO, SEL, class};
+use libc;
 
+use std::os::raw::c_void;
+use std::sync::Mutex;
 use std::collections::VecDeque;
 use std::sync::Arc;
+use os::macos::{ ActivationPolicy, WindowExt };
 
 use CreationError;
 use CursorState;
 use Event;
 use MouseCursor;
 use WindowAttributes;
-use libc;
-
-use std::os::raw::c_void;
-
-use os::macos::{ ActivationPolicy, WindowExt };
 
 mod idref;
 use self::idref::IdRef;
-
 mod responder;
-
-mod event_handler;
-pub use self::event_handler::*;
+mod event_responder;
+pub use self::event_responder::*;
 
 #[derive(Clone, Default)]
 pub struct PlatformSpecificWindowBuilderAttributes {
@@ -103,8 +100,8 @@ pub struct Window {
     window: IdRef,
     host_view: IdRef,
     view: IdRef,
-    // controller: Controller,
     timer: IdRef,
+    pending_events: Mutex<VecDeque<Event>>,
 }
 
 impl Drop for Window {
@@ -154,6 +151,9 @@ impl Window {
             Some(parent) => {
                 let host_view_id = parent as id;
                 let window = unsafe{ msg_send![host_view_id, window] };
+                // let event_responder = EventResponder{};
+                // let pop = || { info!("poppp!") };
+
                 let view = unsafe { msg_send![responder::get_window_responder_class(), new] };
 
                 // pub struct MyController {}
@@ -199,6 +199,7 @@ impl Window {
                     view: IdRef::new(view),
                     // controller: controller,
                     timer: IdRef::retain(timer),
+                    pending_events: Mutex::new(VecDeque::new()),
                 })
             },
             None => Err(CreationError::OsError("Parent view is null.".to_string()))

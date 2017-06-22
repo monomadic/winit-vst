@@ -1,6 +1,6 @@
-pub struct EventHandler {}
+pub struct EventResponder {}
 
-impl EventHandler {
+impl EventResponder {
 	pub fn handle_event(&self) {
 		info!("event called");
 	}
