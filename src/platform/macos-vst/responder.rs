@@ -7,8 +7,11 @@ use objc::runtime::{Class, Object, Sel};
 use objc::declare::ClassDecl;
 
 use std::os::raw::c_void;
+use std::sync::Mutex; // Mutex<VecDeque<Event>>
+use std::collections::VecDeque;
 
 use platform::platform::event_responder::*;
+use Event;
 
 // pub fn get_window_responder_class<T>(responder: T) -> *const Class where T : EventResponder {
 pub fn get_window_responder_class() -> *const Class {
@@ -29,6 +32,8 @@ pub fn get_window_responder_class() -> *const Class {
         decl.add_ivar::<*mut c_void>("eventHandler");
         // decl.add_ivar::<*mut c_void>("theTimer");
 
+        decl.add_ivar::<*mut c_void>("pendingEvents");
+
         // extern "C" fn setViewController(this: &mut Object, _: Sel, controller: *mut c_void) {
         //     unsafe {
         //         this.set_ivar("ViewController", controller);
@@ -39,6 +44,11 @@ pub fn get_window_responder_class() -> *const Class {
         //         this.set_ivar("EventCallbacks", handler);
         //     }
         // }
+        extern "C" fn setPendingEvents(this: &mut Object, _: Sel, vec: *mut c_void) {
+            unsafe {
+                this.set_ivar("pendingEvents", vec);
+            }
+        }
 
         // @property(readonly) BOOL acceptsFirstResponder;
         extern "C" fn acceptsFirstResponder(_: &Object, _: Sel) -> BOOL {
@@ -71,6 +81,14 @@ pub fn get_window_responder_class() -> *const Class {
         extern "C" fn mouseEvent(this: &Object, _: Sel, mouseEvent: id) {
             use cocoa::appkit::NSEvent;
             info!("NSEvent type: {:?}", unsafe { NSEvent::eventType(mouseEvent) });
+            // info!("Winit Event type: {:?}", event::NSEventToEvent(mouseEvent));
+
+            unsafe {
+                let pendingEvents: *mut c_void = *this.get_ivar("pendingEvents");
+                let pendingEvents = pendingEvents as *mut VecDeque<Event>;
+                info!("pendingEvents: {}", (*pendingEvents).len());
+                // (*handler).handle_event();
+            }
 
             // unsafe {
             //     let handler: *mut c_void = *this.get_ivar("eventHandler");
@@ -89,6 +107,10 @@ pub fn get_window_responder_class() -> *const Class {
         // decl.add_method(sel!(setViewController:),
         //                 setViewController as
         //                 extern "C" fn(this: &mut Object, _: Sel, _: *mut c_void));
+
+        decl.add_method(sel!(setPendingEvents:),
+                        setPendingEvents as
+                        extern "C" fn(this: &mut Object, _: Sel, _: *mut c_void));
 
         decl.add_method(sel!(acceptsFirstResponder),
             acceptsFirstResponder as extern fn(this: &Object, _: Sel) -> BOOL);

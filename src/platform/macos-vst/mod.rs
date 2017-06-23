@@ -79,6 +79,7 @@ impl<'a> Iterator for PollEventsIterator<'a> {
 
     #[inline]
     fn next(&mut self) -> Option<Event> {
+        info!("pending_events: {}", self.window.pending_events.len());
         None
     }
 }
@@ -101,7 +102,7 @@ pub struct Window {
     host_view: IdRef,
     view: IdRef,
     timer: IdRef,
-    pending_events: Mutex<VecDeque<Event>>,
+    pending_events: Box<VecDeque<Event>>,
 }
 
 impl Drop for Window {
@@ -154,7 +155,14 @@ impl Window {
                 // let event_responder = EventResponder{};
                 // let pop = || { info!("poppp!") };
 
-                let view = unsafe { msg_send![responder::get_window_responder_class(), new] };
+
+                let view: id = unsafe { msg_send![responder::get_window_responder_class(), new] };
+
+                let mut pending_events = Box::new(VecDeque::new());
+                let pending_events_ptr: *mut VecDeque<Event> = &mut *pending_events;
+                unsafe {
+                    (&mut *view).set_ivar("pendingEvents", pending_events_ptr as *mut ::std::os::raw::c_void);
+                }
 
                 // pub struct MyController {}
                 // impl ViewController for MyController {
@@ -199,7 +207,7 @@ impl Window {
                     view: IdRef::new(view),
                     // controller: controller,
                     timer: IdRef::retain(timer),
-                    pending_events: Mutex::new(VecDeque::new()),
+                    pending_events: pending_events,
                 })
             },
             None => Err(CreationError::OsError("Parent view is null.".to_string()))
@@ -285,7 +293,7 @@ impl Window {
 
     #[inline]
     pub fn platform_window(&self) -> *mut libc::c_void {
-        warn!("platform_window() requested!");
+        // warn!("platform_window() requested!");
         *self.window as *mut libc::c_void
     }
 
