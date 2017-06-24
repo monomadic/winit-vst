@@ -31,7 +31,7 @@ pub fn get_window_responder_class() -> *const Class {
 
         // decl.add_ivar::<*mut c_void>("ViewController");
         // decl.add_ivar::<*mut c_void>("EventCallbacks");
-        decl.add_ivar::<*mut c_void>("eventHandler");
+        // decl.add_ivar::<*mut c_void>("eventHandler");
         // decl.add_ivar::<*mut c_void>("theTimer");
 
         decl.add_ivar::<*mut c_void>("pendingEvents");
@@ -46,11 +46,11 @@ pub fn get_window_responder_class() -> *const Class {
         //         this.set_ivar("EventCallbacks", handler);
         //     }
         // }
-        extern "C" fn setPendingEvents(this: &mut Object, _: Sel, vec: *mut c_void) {
-            unsafe {
-                this.set_ivar("pendingEvents", vec);
-            }
-        }
+        // extern "C" fn setPendingEvents(this: &mut Object, _: Sel, vec: *mut c_void) {
+        //     unsafe {
+        //         this.set_ivar("pendingEvents", vec);
+        //     }
+        // }
 
         // @property(readonly) BOOL acceptsFirstResponder;
         extern "C" fn acceptsFirstResponder(_: &Object, _: Sel) -> BOOL {
@@ -83,6 +83,10 @@ pub fn get_window_responder_class() -> *const Class {
         extern "C" fn mouseEvent(this: &Object, _: Sel, mouseEvent: id) {
             use cocoa::appkit::NSEvent;
             info!("NSEvent type: {:?}", unsafe { NSEvent::eventType(mouseEvent) });
+
+            let pe_ptr: *mut c_void = unsafe { *this.get_ivar("pendingEvents") };
+            let pe = unsafe { &mut *(pe_ptr as *mut VecDeque<Event>) };
+            pe.push_back(Event::MouseInput(ElementState::Pressed, MouseButton::Left));
         }
 
         // decl.add_method(sel!(setEventCallbacks:),
@@ -91,9 +95,9 @@ pub fn get_window_responder_class() -> *const Class {
         //                 setViewController as
         //                 extern "C" fn(this: &mut Object, _: Sel, _: *mut c_void));
 
-        decl.add_method(sel!(setPendingEvents:),
-                        setPendingEvents as
-                        extern "C" fn(this: &mut Object, _: Sel, _: *mut c_void));
+        // decl.add_method(sel!(setPendingEvents:),
+        //                 setPendingEvents as
+        //                 extern "C" fn(this: &mut Object, _: Sel, _: *mut c_void));
 
         decl.add_method(sel!(acceptsFirstResponder),
             acceptsFirstResponder as extern fn(this: &Object, _: Sel) -> BOOL);

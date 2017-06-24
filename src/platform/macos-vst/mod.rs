@@ -204,8 +204,8 @@ impl Window {
                 // let event_responder = EventResponder{};
                 // let pop = || { info!("poppp!") };
 
-                // let view: id = unsafe { msg_send![responder::get_window_responder_class(), new] };
-                let view: id = unsafe { create_and_attach_view(host_view_id) };
+                let view: id = unsafe { msg_send![responder::get_window_responder_class(), new] };
+                // let view: id = unsafe { create_and_attach_view(host_view_id) };
 
                 let mut pending_events = Box::new(VecDeque::new());
                 // let pending_events_ptr: *mut VecDeque<Event> = &mut *pending_events;
@@ -213,6 +213,10 @@ impl Window {
                 //     // msg_send![view, setPendingEvents:(pending_events_ptr as *mut c_void)];
                 //     (&mut *view).set_ivar("pendingEvents", pending_events_ptr as *mut ::std::os::raw::c_void);
                 // }
+                let pe_ptr: *mut VecDeque<Event> = pending_events.as_mut() as *mut _;
+                unsafe {
+                    (&mut *view).set_ivar("pendingEvents", pe_ptr as *mut c_void);
+                }
 
                 // use objc::runtime::{Class};
                 // info!("creating timer");
