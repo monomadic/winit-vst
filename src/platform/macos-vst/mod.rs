@@ -82,9 +82,9 @@ impl<'a> Iterator for PollEventsIterator<'a> {
 
     #[inline]
     fn next(&mut self) -> Option<Event> {
-        // if let Some(ev) = self.window.pending_events.pop_front() {
-        //     return Some(ev);
-        // }
+        if let Some(ev) = self.window.pending_events.pop_front() {
+            return Some(ev);
+        }
 
         // let event: Option<Event>;
         // unsafe {
@@ -101,6 +101,7 @@ impl<'a> Iterator for PollEventsIterator<'a> {
         //     let _: () = msg_send![pool, release];
         // }
         // event
+        None
     }
 }
 
