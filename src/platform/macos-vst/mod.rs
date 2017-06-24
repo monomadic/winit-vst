@@ -74,14 +74,38 @@ pub struct PollEventsIterator<'a> {
     window: &'a Window
 }
 
+use cocoa::foundation::{ NSAutoreleasePool, NSDate, NSDefaultRunLoopMode };
+use cocoa::appkit;
+use cocoa::appkit::{ NSApplication, NSColor, NSEvent, NSView, NSWindow };
+
 impl<'a> Iterator for PollEventsIterator<'a> {
     type Item = Event;
 
     #[inline]
-    fn next(&mut self) -> Option<Event> {
-        info!("pending_events: {}", self.window.pending_events.len());
-        None
+    fn next(&mut self, ) -> Option<Event> {
+        let event: Option<Event>;
+        unsafe {
+            let pool = NSAutoreleasePool::new(nil);
+
+            let nsevent = appkit::NSApp().nextEventMatchingMask_untilDate_inMode_dequeue_(
+                appkit::NSAnyEventMask.bits() | appkit::NSEventMaskPressure.bits(),
+                NSDate::distantPast(nil),
+                NSDefaultRunLoopMode,
+                YES);
+
+            event = NSEventToEvent(self.window, nsevent);
+
+            let _: () = msg_send![pool, release];
+        }
+        event
     }
+}
+
+pub unsafe fn NSEventToEvent(window: &Window, nsevent: id) -> Option<Event> {
+    if nsevent == nil { return None; }
+
+    let event_type = nsevent.eventType();
+    None
 }
 
 pub struct WaitEventsIterator<'a> {
@@ -161,6 +185,7 @@ impl Window {
                 let mut pending_events = Box::new(VecDeque::new());
                 let pending_events_ptr: *mut VecDeque<Event> = &mut *pending_events;
                 unsafe {
+                    // msg_send![view, setPendingEvents:(pending_events_ptr as *mut c_void)];
                     (&mut *view).set_ivar("pendingEvents", pending_events_ptr as *mut ::std::os::raw::c_void);
                 }
 
@@ -200,6 +225,8 @@ impl Window {
                     NSWindow::makeKeyAndOrderFront_(window, nil);
                     NSView::setWantsBestResolutionOpenGLSurface_(view, YES);
                 };
+
+                info!("created window: {:?}", window as id);
 
                 Ok(Window{
                     window: IdRef::retain(window),

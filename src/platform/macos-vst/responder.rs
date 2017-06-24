@@ -12,6 +12,8 @@ use std::collections::VecDeque;
 
 use platform::platform::event_responder::*;
 use Event;
+use ElementState;
+use MouseButton;
 
 // pub fn get_window_responder_class<T>(responder: T) -> *const Class where T : EventResponder {
 pub fn get_window_responder_class() -> *const Class {
@@ -84,10 +86,10 @@ pub fn get_window_responder_class() -> *const Class {
             // info!("Winit Event type: {:?}", event::NSEventToEvent(mouseEvent));
 
             unsafe {
-                let pendingEvents: *mut c_void = *this.get_ivar("pendingEvents");
-                let pendingEvents = pendingEvents as *mut VecDeque<Event>;
-                info!("pendingEvents: {}", (*pendingEvents).len());
-                // (*handler).handle_event();
+                // let pendingEvents: *mut c_void = *this.get_ivar("pendingEvents");
+                // let pendingEvents = pendingEvents as *mut VecDeque<Event>;
+                // info!("pendingEvents: {}", (*pendingEvents).len());
+                // (*pendingEvents).push_back(Event::MouseInput(ElementState::Pressed, MouseButton::Left));
             }
 
             // unsafe {
