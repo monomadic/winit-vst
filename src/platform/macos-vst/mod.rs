@@ -19,8 +19,8 @@ use WindowAttributes;
 mod idref;
 use self::idref::IdRef;
 mod responder;
-mod event_responder;
-pub use self::event_responder::*;
+// mod event_responder;
+// pub use self::event_responder::*;
 
 #[derive(Clone, Default)]
 pub struct PlatformSpecificWindowBuilderAttributes {
@@ -82,7 +82,11 @@ impl<'a> Iterator for PollEventsIterator<'a> {
     type Item = Event;
 
     #[inline]
-    fn next(&mut self, ) -> Option<Event> {
+    fn next(&mut self) -> Option<Event> {
+        // if let Some(ev) = self.window.pending_events.pop_front() {
+        //     return Some(ev);
+        // }
+
         let event: Option<Event>;
         unsafe {
             let pool = NSAutoreleasePool::new(nil);
@@ -101,11 +105,27 @@ impl<'a> Iterator for PollEventsIterator<'a> {
     }
 }
 
+use ElementState;
+use MouseButton;
 pub unsafe fn NSEventToEvent(window: &Window, nsevent: id) -> Option<Event> {
     if nsevent == nil { return None; }
 
     let event_type = nsevent.eventType();
-    None
+    appkit::NSApp().sendEvent_(if let appkit::NSKeyDown = event_type { nil } else { nsevent });
+
+    info!("casting event in NSEventToEvent: {:?}", event_type);
+
+    match event_type {
+        appkit::NSLeftMouseDown         => { Some(Event::MouseInput(ElementState::Pressed, MouseButton::Left)) },
+        appkit::NSLeftMouseUp           => { Some(Event::MouseInput(ElementState::Released, MouseButton::Left)) },
+        appkit::NSRightMouseDown        => { Some(Event::MouseInput(ElementState::Pressed, MouseButton::Right)) },
+        appkit::NSRightMouseUp          => { Some(Event::MouseInput(ElementState::Released, MouseButton::Right)) },
+        appkit::NSOtherMouseDown        => { Some(Event::MouseInput(ElementState::Pressed, MouseButton::Middle)) },
+        appkit::NSOtherMouseUp          => { Some(Event::MouseInput(ElementState::Released, MouseButton::Middle)) },
+        appkit::NSMouseEntered          => { Some(Event::MouseEntered) },
+        appkit::NSMouseExited           => { Some(Event::MouseLeft) },
+        _  => { None },
+    }
 }
 
 pub struct WaitEventsIterator<'a> {
@@ -125,7 +145,6 @@ pub struct Window {
     window: IdRef,
     host_view: IdRef,
     view: IdRef,
-    timer: IdRef,
     pending_events: Box<VecDeque<Event>>,
 }
 
@@ -133,7 +152,7 @@ impl Drop for Window {
     fn drop(&mut self) {
         info!("dropping window.");
         info!("invalidating timer...");
-        unsafe { msg_send![*self.timer, invalidate] };
+        // unsafe { msg_send![*self.timer, invalidate] };
         info!("stopped timer!");
     }
 }
@@ -150,6 +169,12 @@ impl WindowExt for Window {
         warn!("raw pointer to nsview requested!");
         *self.view as *mut c_void
     }
+}
+
+unsafe fn create_and_attach_view(host_nsview: id) -> id {
+    let child_nsview = NSView::alloc(nil);
+    let child_view = child_nsview.initWithFrame_(NSView::frame(host_nsview));
+    child_view
 }
 
 impl Window {
@@ -179,43 +204,27 @@ impl Window {
                 // let event_responder = EventResponder{};
                 // let pop = || { info!("poppp!") };
 
-
-                let view: id = unsafe { msg_send![responder::get_window_responder_class(), new] };
+                // let view: id = unsafe { msg_send![responder::get_window_responder_class(), new] };
+                let view: id = unsafe { create_and_attach_view(host_view_id) };
 
                 let mut pending_events = Box::new(VecDeque::new());
-                let pending_events_ptr: *mut VecDeque<Event> = &mut *pending_events;
-                unsafe {
-                    // msg_send![view, setPendingEvents:(pending_events_ptr as *mut c_void)];
-                    (&mut *view).set_ivar("pendingEvents", pending_events_ptr as *mut ::std::os::raw::c_void);
-                }
-
-                // pub struct MyController {}
-                // impl ViewController for MyController {
-                //     fn on_mouse_down(&mut self) {
-                //         info!("Yaaaas");
-                //     }
-                // }
-                // let mut controller = Controller::new(Box::new(MyController {}));
-                // set_view_controller(view, &mut controller);
-
-                // fn set_view_controller(view: id, controller: *mut Controller) {
-                //     unsafe {
-                //         msg_send![view, setViewController:(controller as *mut c_void)];
-                //     }
+                // let pending_events_ptr: *mut VecDeque<Event> = &mut *pending_events;
+                // unsafe {
+                //     // msg_send![view, setPendingEvents:(pending_events_ptr as *mut c_void)];
+                //     (&mut *view).set_ivar("pendingEvents", pending_events_ptr as *mut ::std::os::raw::c_void);
                 // }
 
-                use objc::runtime::{Class};
-
-                info!("creating timer");
-                let timer: id = unsafe { msg_send![ Class::get("NSTimer").unwrap(),
-                        scheduledTimerWithTimeInterval:0.2
-                        target:view
-                        selector:sel!(timerFired:)
-                        userInfo:nil
-                        repeats:YES
-                    ]
-                };
-                info!("timer created.");
+                // use objc::runtime::{Class};
+                // info!("creating timer");
+                // let timer: id = unsafe { msg_send![ Class::get("NSTimer").unwrap(),
+                //         scheduledTimerWithTimeInterval:0.2
+                //         target:view
+                //         selector:sel!(timerFired:)
+                //         userInfo:nil
+                //         repeats:YES
+                //     ]
+                // };
+                // info!("timer created.");
                 // Timer { id: IdRef::new(timer) };
                 // unsafe { msg_send![*self.timer, invalidate] };
                 
@@ -232,8 +241,7 @@ impl Window {
                     window: IdRef::retain(window),
                     host_view: IdRef::retain(host_view_id),
                     view: IdRef::new(view),
-                    // controller: controller,
-                    timer: IdRef::retain(timer),
+                    // timer: IdRef::retain(timer),
                     pending_events: pending_events,
                 })
             },

@@ -10,7 +10,7 @@ use std::os::raw::c_void;
 use std::sync::Mutex; // Mutex<VecDeque<Event>>
 use std::collections::VecDeque;
 
-use platform::platform::event_responder::*;
+// use platform::platform::event_responder::*;
 use Event;
 use ElementState;
 use MouseButton;
@@ -83,25 +83,6 @@ pub fn get_window_responder_class() -> *const Class {
         extern "C" fn mouseEvent(this: &Object, _: Sel, mouseEvent: id) {
             use cocoa::appkit::NSEvent;
             info!("NSEvent type: {:?}", unsafe { NSEvent::eventType(mouseEvent) });
-            // info!("Winit Event type: {:?}", event::NSEventToEvent(mouseEvent));
-
-            unsafe {
-                // let pendingEvents: *mut c_void = *this.get_ivar("pendingEvents");
-                // let pendingEvents = pendingEvents as *mut VecDeque<Event>;
-                // info!("pendingEvents: {}", (*pendingEvents).len());
-                // (*pendingEvents).push_back(Event::MouseInput(ElementState::Pressed, MouseButton::Left));
-            }
-
-            // unsafe {
-            //     let handler: *mut c_void = *this.get_ivar("eventHandler");
-            //     let mut handler = handler as *mut T;
-
-            //     (*handler).handle_event();
-            // }
-
-            // Note: to get raw event type (for events unsupported by cocoa-rs),
-            // let event: u64 = unsafe { msg_send![mouseEvent, type] };
-            // info!("type: {}", event);
         }
 
         // decl.add_method(sel!(setEventCallbacks:),
