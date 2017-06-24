@@ -69,9 +69,8 @@ impl MonitorId {
     }
 }
 
-
 pub struct PollEventsIterator<'a> {
-    window: &'a mut Window
+    window: &'a Window
 }
 
 use cocoa::foundation::{ NSAutoreleasePool, NSDate, NSDefaultRunLoopMode };
@@ -83,49 +82,50 @@ impl<'a> Iterator for PollEventsIterator<'a> {
 
     #[inline]
     fn next(&mut self) -> Option<Event> {
-        if let Some(ev) = self.window.pending_events.pop_front() {
-            return Some(ev);
-        }
+        // if let Some(ev) = self.window.pending_events.pop_front() {
+        //     return Some(ev);
+        // }
 
-        let event: Option<Event>;
-        unsafe {
-            let pool = NSAutoreleasePool::new(nil);
+        // let event: Option<Event>;
+        // unsafe {
+        //     let pool = NSAutoreleasePool::new(nil);
 
-            let nsevent = appkit::NSApp().nextEventMatchingMask_untilDate_inMode_dequeue_(
-                appkit::NSAnyEventMask.bits() | appkit::NSEventMaskPressure.bits(),
-                NSDate::distantPast(nil),
-                NSDefaultRunLoopMode,
-                YES);
+        //     let nsevent = appkit::NSApp().nextEventMatchingMask_untilDate_inMode_dequeue_(
+        //         appkit::NSAnyEventMask.bits() | appkit::NSEventMaskPressure.bits(),
+        //         NSDate::distantPast(nil),
+        //         NSDefaultRunLoopMode,
+        //         YES);
 
-            event = NSEventToEvent(self.window, nsevent);
+        //     event = NSEventToEvent(self.window, nsevent);
 
-            let _: () = msg_send![pool, release];
-        }
-        event
+        //     let _: () = msg_send![pool, release];
+        // }
+        // event
     }
 }
 
 use ElementState;
 use MouseButton;
 pub unsafe fn NSEventToEvent(window: &Window, nsevent: id) -> Option<Event> {
-    if nsevent == nil { return None; }
+    return None
+    // if nsevent == nil { return None; }
 
-    let event_type = nsevent.eventType();
-    appkit::NSApp().sendEvent_(if let appkit::NSKeyDown = event_type { nil } else { nsevent });
+    // let event_type = nsevent.eventType();
+    // appkit::NSApp().sendEvent_(if let appkit::NSKeyDown = event_type { nil } else { nsevent });
 
-    info!("casting event in NSEventToEvent: {:?}", event_type);
+    // info!("casting event in NSEventToEvent: {:?}", event_type);
 
-    match event_type {
-        appkit::NSLeftMouseDown         => { Some(Event::MouseInput(ElementState::Pressed, MouseButton::Left)) },
-        appkit::NSLeftMouseUp           => { Some(Event::MouseInput(ElementState::Released, MouseButton::Left)) },
-        appkit::NSRightMouseDown        => { Some(Event::MouseInput(ElementState::Pressed, MouseButton::Right)) },
-        appkit::NSRightMouseUp          => { Some(Event::MouseInput(ElementState::Released, MouseButton::Right)) },
-        appkit::NSOtherMouseDown        => { Some(Event::MouseInput(ElementState::Pressed, MouseButton::Middle)) },
-        appkit::NSOtherMouseUp          => { Some(Event::MouseInput(ElementState::Released, MouseButton::Middle)) },
-        appkit::NSMouseEntered          => { Some(Event::MouseEntered) },
-        appkit::NSMouseExited           => { Some(Event::MouseLeft) },
-        _  => { None },
-    }
+    // match event_type {
+    //     appkit::NSLeftMouseDown         => { Some(Event::MouseInput(ElementState::Pressed, MouseButton::Left)) },
+    //     appkit::NSLeftMouseUp           => { Some(Event::MouseInput(ElementState::Released, MouseButton::Left)) },
+    //     appkit::NSRightMouseDown        => { Some(Event::MouseInput(ElementState::Pressed, MouseButton::Right)) },
+    //     appkit::NSRightMouseUp          => { Some(Event::MouseInput(ElementState::Released, MouseButton::Right)) },
+    //     appkit::NSOtherMouseDown        => { Some(Event::MouseInput(ElementState::Pressed, MouseButton::Middle)) },
+    //     appkit::NSOtherMouseUp          => { Some(Event::MouseInput(ElementState::Released, MouseButton::Middle)) },
+    //     appkit::NSMouseEntered          => { Some(Event::MouseEntered) },
+    //     appkit::NSMouseExited           => { Some(Event::MouseLeft) },
+    //     _  => { None },
+    // }
 }
 
 pub struct WaitEventsIterator<'a> {
@@ -148,14 +148,14 @@ pub struct Window {
     pending_events: Box<VecDeque<Event>>,
 }
 
-impl Drop for Window {
-    fn drop(&mut self) {
-        info!("dropping window.");
-        info!("invalidating timer...");
-        // unsafe { msg_send![*self.timer, invalidate] };
-        info!("stopped timer!");
-    }
-}
+// impl Drop for Window {
+//     fn drop(&mut self) {
+//         info!("dropping window.");
+//         info!("invalidating timer...");
+//         // unsafe { msg_send![*self.timer, invalidate] };
+//         info!("stopped timer!");
+//     }
+// }
 
 impl WindowExt for Window {
     #[inline]
@@ -201,36 +201,16 @@ impl Window {
             Some(parent) => {
                 let host_view_id = parent as id;
                 let window = unsafe{ msg_send![host_view_id, window] };
-                // let event_responder = EventResponder{};
-                // let pop = || { info!("poppp!") };
 
                 let view: id = unsafe { msg_send![responder::get_window_responder_class(), new] };
                 // let view: id = unsafe { create_and_attach_view(host_view_id) };
 
                 let mut pending_events = Box::new(VecDeque::new());
-                // let pending_events_ptr: *mut VecDeque<Event> = &mut *pending_events;
-                // unsafe {
-                //     // msg_send![view, setPendingEvents:(pending_events_ptr as *mut c_void)];
-                //     (&mut *view).set_ivar("pendingEvents", pending_events_ptr as *mut ::std::os::raw::c_void);
-                // }
+
                 let pe_ptr: *mut VecDeque<Event> = pending_events.as_mut() as *mut _;
                 unsafe {
                     (&mut *view).set_ivar("pendingEvents", pe_ptr as *mut c_void);
                 }
-
-                // use objc::runtime::{Class};
-                // info!("creating timer");
-                // let timer: id = unsafe { msg_send![ Class::get("NSTimer").unwrap(),
-                //         scheduledTimerWithTimeInterval:0.2
-                //         target:view
-                //         selector:sel!(timerFired:)
-                //         userInfo:nil
-                //         repeats:YES
-                //     ]
-                // };
-                // info!("timer created.");
-                // Timer { id: IdRef::new(timer) };
-                // unsafe { msg_send![*self.timer, invalidate] };
                 
                 unsafe {
                     NSView::addSubview_(host_view_id, view);
@@ -302,7 +282,7 @@ impl Window {
     }
 
     #[inline]
-    pub fn poll_events(&mut self) -> PollEventsIterator {
+    pub fn poll_events(&self) -> PollEventsIterator {
         PollEventsIterator {
             window: self,
         }

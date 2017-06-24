@@ -292,7 +292,7 @@ impl Window {
     ///
     /// Contrary to `wait_events`, this function never blocks.
     #[inline]
-    pub fn poll_events(&mut self) -> PollEventsIterator {
+    pub fn poll_events(&self) -> PollEventsIterator {
         PollEventsIterator(self.window.poll_events())
     }
 
