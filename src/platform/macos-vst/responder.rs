@@ -47,11 +47,12 @@ pub fn get_window_responder_class() -> *const Class {
 
         }
 
-        extern "C" fn mouseEvent(this: &Object, _: Sel, mouseEvent: id) {
+        extern "C" fn mouseEvent(this: &Object, _: Sel, nsevent: id) {
             use cocoa::appkit;
-            use cocoa::appkit::NSEvent;
+            use cocoa::appkit::{ NSEvent, NSView, NSWindow };
+            use cocoa::foundation::{ NSRect, NSSize };
 
-            let event_type = unsafe { NSEvent::eventType(mouseEvent) };
+            let event_type = unsafe { NSEvent::eventType(nsevent) };
 
             let pe_ptr: *mut c_void = unsafe { *this.get_ivar("pendingEvents") };
             let pe = unsafe { &mut *(pe_ptr as *mut VecDeque<Event>) };
@@ -65,6 +66,24 @@ pub fn get_window_responder_class() -> *const Class {
                 appkit::NSOtherMouseUp          => { Some(Event::MouseInput(ElementState::Released, MouseButton::Middle)) },
                 appkit::NSMouseEntered          => { Some(Event::MouseEntered) },
                 appkit::NSMouseExited           => { Some(Event::MouseLeft) },
+
+                appkit::NSMouseMoved            |
+                appkit::NSLeftMouseDragged      |
+                appkit::NSOtherMouseDragged     |
+                appkit::NSRightMouseDragged     => {
+                    let window_point = unsafe { nsevent.locationInWindow() };
+                    // let cWindow: id = unsafe { msg_send![nsevent, window] };
+                    // let scale_factor = hidpi_factor(cWindow);
+
+                    // Some(Event::MouseMoved((scale_factor * window_point.x as f32) as i32,
+                    //                        (scale_factor * window_point.y as f32) as i32))
+                    let cWindow: id = unsafe { msg_send![nsevent, window] };
+                    let cView: id = unsafe { msg_send![cWindow, contentView] };
+                    let scale_factor = hidpi_factor(cWindow);
+
+                    Some(Event::MouseMoved((window_point.x as f32 * scale_factor) as i32,
+                                            (((unsafe { NSView::frame(cView).size.height } - window_point.y) as f32 * scale_factor) as i32)))
+                },
 
                 _  => { None },
             };
@@ -101,4 +120,11 @@ pub fn get_window_responder_class() -> *const Class {
         RESPONDER_CLASS = decl.register();
     });
     unsafe { RESPONDER_CLASS }
+}
+
+fn hidpi_factor(window: id) -> f32 {
+    use cocoa::appkit::NSWindow;
+    unsafe {
+        NSWindow::backingScaleFactor(window) as f32
+    }
 }
