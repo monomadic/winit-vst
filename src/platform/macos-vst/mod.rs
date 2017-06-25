@@ -82,7 +82,7 @@ impl<'a> Iterator for PollEventsIterator<'a> {
 
     #[inline]
     fn next(&mut self) -> Option<Event> {
-        if let Some(ev) = self.window.pending_events.pop_front() {
+        if let Some(ev) = self.window.pending_events.lock().unwrap().pop_front() {
             return Some(ev);
         }
 
@@ -146,7 +146,7 @@ pub struct Window {
     window: IdRef,
     host_view: IdRef,
     view: IdRef,
-    pending_events: Box<VecDeque<Event>>,
+    pending_events: Mutex<Box<VecDeque<Event>>>,
 }
 
 // impl Drop for Window {
@@ -227,7 +227,7 @@ impl Window {
                     host_view: IdRef::retain(host_view_id),
                     view: IdRef::new(view),
                     // timer: IdRef::retain(timer),
-                    pending_events: pending_events,
+                    pending_events: Mutex::new(pending_events),
                 })
             },
             None => Err(CreationError::OsError("Parent view is null.".to_string()))
