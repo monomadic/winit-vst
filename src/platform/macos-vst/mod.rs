@@ -219,6 +219,7 @@ impl Window {
                     NSView::addSubview_(host_view_id, view);
                     NSWindow::setContentView_(window, view);
                     NSWindow::makeKeyAndOrderFront_(window, nil);
+                    NSWindow::setAcceptsMouseMovedEvents_(window, YES);
                     NSView::setWantsBestResolutionOpenGLSurface_(view, YES);
                 };
 

@@ -53,6 +53,7 @@ pub fn get_window_responder_class() -> *const Class {
             use cocoa::foundation::{ NSRect, NSSize };
 
             let event_type = unsafe { NSEvent::eventType(nsevent) };
+            // info!("NSEvent:{:?}", event_type);
 
             let pe_ptr: *mut c_void = unsafe { *this.get_ivar("pendingEvents") };
             let pe = unsafe { &mut *(pe_ptr as *mut VecDeque<Event>) };
@@ -66,17 +67,11 @@ pub fn get_window_responder_class() -> *const Class {
                 appkit::NSOtherMouseUp          => { Some(Event::MouseInput(ElementState::Released, MouseButton::Middle)) },
                 appkit::NSMouseEntered          => { Some(Event::MouseEntered) },
                 appkit::NSMouseExited           => { Some(Event::MouseLeft) },
-
                 appkit::NSMouseMoved            |
                 appkit::NSLeftMouseDragged      |
                 appkit::NSOtherMouseDragged     |
                 appkit::NSRightMouseDragged     => {
                     let window_point = unsafe { nsevent.locationInWindow() };
-                    // let cWindow: id = unsafe { msg_send![nsevent, window] };
-                    // let scale_factor = hidpi_factor(cWindow);
-
-                    // Some(Event::MouseMoved((scale_factor * window_point.x as f32) as i32,
-                    //                        (scale_factor * window_point.y as f32) as i32))
                     let cWindow: id = unsafe { msg_send![nsevent, window] };
                     let cView: id = unsafe { msg_send![cWindow, contentView] };
                     let scale_factor = hidpi_factor(cWindow);
@@ -89,7 +84,7 @@ pub fn get_window_responder_class() -> *const Class {
             };
 
             if let Some(ev) = event {
-                info!("Event stored: NSEvent:{:?} Event:{:?}", event_type, ev);
+                // info!("Event stored: NSEvent:{:?} Event:{:?}", event_type, ev);
                 pe.push_back(ev);
             }
         }
