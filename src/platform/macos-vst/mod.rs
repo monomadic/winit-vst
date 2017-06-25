@@ -83,6 +83,7 @@ impl<'a> Iterator for PollEventsIterator<'a> {
     #[inline]
     fn next(&mut self) -> Option<Event> {
         if let Some(ev) = self.window.pending_events.lock().unwrap().pop_front() {
+            info!("returning event with next(): {:?}", ev);
             return Some(ev);
         }
 
