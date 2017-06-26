@@ -14,6 +14,10 @@ use Event;
 use ElementState;
 use MouseButton;
 
+fn mouseMoved(nsevent: id) {
+
+}
+
 // pub fn get_window_responder_class<T>(responder: T) -> *const Class where T : EventResponder {
 pub fn get_window_responder_class() -> *const Class {
 
@@ -36,8 +40,29 @@ pub fn get_window_responder_class() -> *const Class {
         }
 
         // func acceptsFirstMouse(for event: NSEvent?) -> Bool
-        extern "C" fn acceptsFirstMouse(_: &Object, _: Sel, theEvent: id) -> BOOL {
+        extern "C" fn acceptsFirstMouse(this: &Object, _: Sel, nsevent: id) -> BOOL {
             info!("acceptsFirstMouse() hit");
+
+            use cocoa::appkit;
+            use cocoa::appkit::{ NSEvent, NSView, NSWindow };
+            use cocoa::foundation::{ NSRect, NSSize };
+
+            // we need to update the position of the cursor over the window, as
+            // cocoa does not send mousemove events when the window is not focused.
+            let event_type = unsafe { NSEvent::eventType(nsevent) };
+            // info!("NSEvent:{:?}", event_type);
+
+            let pe_ptr: *mut c_void = unsafe { *this.get_ivar("pendingEvents") };
+            let pe = unsafe { &mut *(pe_ptr as *mut VecDeque<Event>) };
+
+            let window_point = unsafe { nsevent.locationInWindow() };
+            let cWindow: id = unsafe { msg_send![nsevent, window] };
+            let cView: id = unsafe { msg_send![cWindow, contentView] };
+            let scale_factor = hidpi_factor(cWindow);
+
+            pe.push_back(Event::MouseMoved((window_point.x as f32 * scale_factor) as i32,
+                                    (((unsafe { NSView::frame(cView).size.height } - window_point.y) as f32 * scale_factor) as i32)));
+
             YES
         }
 
